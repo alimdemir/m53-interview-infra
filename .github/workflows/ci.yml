@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  api-compose:
+    name: API + PostgreSQL (Docker Compose)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ortam dosyası
+        run: cp .env.example .env
+
+      - name: İmajları derle ve servisleri başlat
+        run: docker compose up -d --build --wait
+
+      - name: Migration
+        run: docker compose exec -T api python manage.py migrate --noinput
+
+      - name: Sağlık kontrolü
+        run: |
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:8000/health/ && exit 0
+            sleep 2
+          done
+          exit 1
+
+      - name: Testler (PostgreSQL üzerinde)
+        run: docker compose exec -T api python manage.py test -v 2
+
+      - name: Hata durumunda loglar
+        if: failure()
+        run: docker compose logs
+
+      - name: Temizlik
+        if: always()
+        run: docker compose down -v
+
+  k8s-kind:
+    name: Kubernetes probe testi (kind)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: kind kümesi
+        uses: helm/kind-action@v1
+
+      - name: İmajı derle ve kümeye yükle
+        run: |
+          docker build -t soru-servisi:1.0 k8s/
+          kind load docker-image soru-servisi:1.0 --name chart-testing
+
+      - name: Deployment ve Service
+        run: kubectl apply -f k8s/deployment.yaml -f k8s/service.yaml
+
+      - name: Rollout (startupProbe model yüklenene kadar bekler)
+        run: kubectl rollout status deployment/soru-servisi --timeout=180s
+
+      - name: Durum
+        if: always()
+        run: |
+          kubectl get pods -o wide
+          kubectl describe deployment soru-servisi | tail -25
+          kubectl logs deployment/soru-servisi
