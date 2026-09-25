@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Mülakat Paneli</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; background: #f4f6f8; color: #1d2733; }
+  header { background: #20374f; color: #fff; padding: 14px 24px; display: flex; justify-content: space-between; }
+  main { display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px; padding: 20px 24px; }
+  .card { background: #fff; border-radius: 8px; padding: 16px 18px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  h2 { font-size: 15px; margin: 0 0 12px; color: #3b5268; text-transform: uppercase; letter-spacing: .04em; }
+  .seg { padding: 8px 0; border-bottom: 1px solid #eef1f4; font-size: 15px; }
+  .seg b { color: #2f6f9f; margin-right: 6px; } .seg span { color: #8795a1; font-size: 12px; margin-right: 8px; }
+  pre { font-size: 12px; background: #0f1b26; color: #b9e6c9; padding: 10px; border-radius: 6px; white-space: pre-wrap; margin: 0; }
+  #status { font-size: 13px; background: #2e8b57; padding: 3px 10px; border-radius: 12px; }
+</style>
+</head>
+<body>
+<header><div>Mülakat Paneli · {{ interview }}</div><div id="status">bağlanıyor…</div></header>
+<main>
+  <section class="card"><h2>Canlı transkript</h2><div id="segments"></div></section>
+  <section class="card"><h2>WebSocket mesajları (JSON)</h2><pre id="log"></pre></section>
+</main>
+<script>
+  const scheme = location.protocol === "https:" ? "wss" : "ws";
+  const url = `${scheme}://${location.host}/ws/interviews/{{ interview.id }}/`;
+  const ws = new WebSocket(url);
+  const log = document.getElementById("log");
+  ws.onopen = () => { document.getElementById("status").textContent = "bağlı · " + url; };
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    log.textContent += e.data + "\n";
+    if (msg.type === "transcript") {
+      const d = document.createElement("div"); d.className = "seg";
+      const t = (msg.start_ms / 1000).toFixed(1);
+      d.innerHTML = `<span>${t} sn</span><b>${msg.speaker}:</b>${msg.text}`;
+      document.getElementById("segments").appendChild(d);
+    }
+  };
+  ws.onclose = () => { document.getElementById("status").textContent = "bağlantı kapandı"; };
+</script>
+</body>
+</html>

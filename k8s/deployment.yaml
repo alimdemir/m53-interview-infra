@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: soru-servisi
+  labels:
+    app: soru-servisi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: soru-servisi
+  template:
+    metadata:
+      labels:
+        app: soru-servisi
+    spec:
+      containers:
+        - name: soru-servisi
+          image: soru-servisi:1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          startupProbe:    # yüklenme süresi
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 12
+          readinessProbe:  # trafik kontrolü
+            httpGet:
+              path: /ready
+              port: 8080
+            periodSeconds: 5
+          livenessProbe:   # kilitlenme kontrolü
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
