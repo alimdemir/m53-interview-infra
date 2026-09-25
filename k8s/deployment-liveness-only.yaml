@@ -1,0 +1,31 @@
+# İlk sürüm: yalnız liveness probe. Model ~25 sn'de yüklendiği için
+# probe erken başarısız olur ve kubelet konteyneri sürekli yeniden başlatır.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: soru-servisi
+  labels:
+    app: soru-servisi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: soru-servisi
+  template:
+    metadata:
+      labels:
+        app: soru-servisi
+    spec:
+      containers:
+        - name: soru-servisi
+          image: soru-servisi:1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 2

@@ -5,3 +5,4 @@ db.sqlite3
 .venv/
 .DS_Store
 .ipynb_checkpoints/
+.staj_adim/
