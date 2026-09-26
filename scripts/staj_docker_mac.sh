@@ -4,20 +4,28 @@
 # (ya da .staj_adim/devam_<n> dosyası oluşturulduğunda kendiliğinden geçer).
 # Kullanım:  bash scripts/staj_docker_mac.sh
 set -uo pipefail
+# Docker Desktop CLI araçları /usr/local/bin'e bağlanmadıysa (kullanıcı kurulumu) PATH'e ekle
+for d in /Applications/Docker.app/Contents/Resources/bin "$HOME/.docker/bin"; do
+  [ -d "$d" ] && PATH="$d:$PATH"
+done
+export PATH
 cd "$(dirname "$0")/.."
 ROOT=$PWD
-FLAGS="$ROOT/.staj_adim"; mkdir -p "$FLAGS"; rm -f "$FLAGS"/devam_* 2>/dev/null
-printf '\e[8;44;150t'          # Terminal penceresini 150x44 yap
+FLAGS="$ROOT/.staj_adim"; mkdir -p "$FLAGS"; rm -f "$FLAGS"/devam_* "$FLAGS"/konum 2>/dev/null
+# Pencereyi ekran kenarlarından uzak tut (ekran görüntüsü kırpılırken kenar efektleri girmesin)
+pencere() { printf '\e[8;38;118t'; printf '\e[3;%st' "${1:-160;160}"; }
+pencere
 
 G='\033[1;32m'; C='\033[1;36m'; D='\033[2m'; N='\033[0m'
 baslik() { clear; printf "${C}▶ %s${N}\n\n" "$1"; }
 run()    { printf "${G}\$ %s${N}\n" "$*"; eval "$@"; echo; }
 bekle()  {
   printf "${D}── adım %s tamam · devam için Enter ──${N}" "$1"
-  for _ in $(seq 1 900); do
+  while :; do
     [ -f "$FLAGS/devam_$1" ] && { echo; return; }
+    [ -f "$FLAGS/konum" ] && { pencere "$(cat "$FLAGS/konum")"; rm -f "$FLAGS/konum"; }
     read -r -t 1 && return
-  done; echo
+  done
 }
 
 # ------------------------------------------------------------------ hazırlık
@@ -76,7 +84,7 @@ bekle 5
 cd "$ROOT"
 baslik "Gün 5 · Yalnız liveness probe: model yüklenmeden yeniden başlatma"
 run 'kubectl config use-context docker-desktop >/dev/null && kubectl get nodes'
-run 'docker build -q -t soru-servisi:1.0 k8s'
+run 'docker build -q -t soru-servisi:1.1 k8s'
 run 'kubectl apply -f k8s/deployment-liveness-only.yaml -f k8s/service.yaml'
 printf "${D}(60 sn bekleniyor...)${N}\n"; sleep 60
 run 'kubectl get pods -l app=soru-servisi'
