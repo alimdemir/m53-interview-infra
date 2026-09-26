@@ -84,7 +84,7 @@ bekle 5
 cd "$ROOT"
 baslik "Gün 5 · Yalnız liveness probe: model yüklenmeden yeniden başlatma"
 run 'kubectl config use-context docker-desktop >/dev/null && kubectl get nodes'
-run 'docker build -q -t soru-servisi:1.1 k8s'
+run 'docker build -q -t soru-servisi:1.2 k8s'
 run 'kubectl apply -f k8s/deployment-liveness-only.yaml -f k8s/service.yaml'
 printf "${D}(60 sn bekleniyor...)${N}\n"; sleep 60
 run 'kubectl get pods -l app=soru-servisi'

@@ -29,7 +29,7 @@ pod_bitsin() { kubectl wait --for=jsonpath='{.status.phase}'=Succeeded "pod/$1" 
 kubectl config use-context docker-desktop >/dev/null
 # önceki denemeden kalanlar
 kubectl delete deployment soru-servisi --ignore-not-found --wait=true >/dev/null 2>&1
-kubectl delete pod kontrol-10 kontrol-11 --ignore-not-found --wait=true >/dev/null 2>&1
+kubectl delete pod kontrol-10 kontrol-12 --ignore-not-found --wait=true >/dev/null 2>&1
 kubectl delete events --all >/dev/null 2>&1
 
 baslik "Gün 5 · Dockerfile düzeldi, pod neden hâlâ eski dosyayı görüyor?"
@@ -41,11 +41,11 @@ run 'grep -n -A1 "image:" k8s/deployment.yaml'
 bekle 1
 
 baslik "Gün 5 · Çözüm: her değişiklikte yeni etiket"
-run 'docker build -q -t soru-servisi:1.1 k8s'
-run 'kubectl run kontrol-11 --image=soru-servisi:1.1 --image-pull-policy=IfNotPresent --restart=Never --command -- ls -l /app/app.py'
-pod_bitsin kontrol-11
-run 'kubectl logs kontrol-11'
-kubectl delete pod kontrol-10 kontrol-11 --wait=false >/dev/null 2>&1
+run 'docker build -q -t soru-servisi:1.2 k8s'
+run 'kubectl run kontrol-12 --image=soru-servisi:1.2 --image-pull-policy=IfNotPresent --restart=Never --command -- ls -l /app/app.py'
+pod_bitsin kontrol-12
+run 'kubectl logs kontrol-12'
+kubectl delete pod kontrol-10 kontrol-12 --wait=false >/dev/null 2>&1
 bekle 2
 
 baslik "Gün 5 · Yalnız liveness probe: model yüklenmeden yeniden başlatma"

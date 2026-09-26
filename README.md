@@ -55,15 +55,15 @@ DB_ENGINE=sqlite .venv/bin/python manage.py test -v 2
 `k8s/app.py`, açılışta modeli belleğe yüklüyormuş gibi yaklaşık 25 saniye bekleyen bir servis. Yükleme bitene kadar `/healthz` ve `/ready` uçları `503` döner.
 
 ```bash
-docker build -t soru-servisi:1.1 k8s/
+docker build -t soru-servisi:1.2 k8s/
 # Docker Desktop'ın yerleşik kümesi yerel imajı doğrudan görür.
-# Ayrı bir kind kümesinde:  kind load docker-image soru-servisi:1.1
-# minikube:                 minikube image load soru-servisi:1.1
+# Ayrı bir kind kümesinde:  kind load docker-image soru-servisi:1.2
+# minikube:                 minikube image load soru-servisi:1.2
 kubectl apply -f k8s/deployment.yaml -f k8s/service.yaml
 kubectl rollout status deployment/soru-servisi
 ```
 
-Karşılaştırma için `k8s/deployment-liveness-only.yaml` yalnızca liveness probe içeren ilk sürümü tutuyor. İmaj her değiştiğinde etiketi de değiştiriyorum (`1.0` → `1.1`); sebebi aşağıdaki tabloda.
+Karşılaştırma için `k8s/deployment-liveness-only.yaml` yalnızca liveness probe içeren ilk sürümü tutuyor. İmaj her değiştiğinde etiketi de değiştiriyorum (`1.0` → `1.1` → `1.2`); sebebi aşağıdaki tabloda.
 
 | Probe | Görevi | Ayar |
 |---|---|---|
@@ -83,7 +83,8 @@ Karşılaştırma için `k8s/deployment-liveness-only.yaml` yalnızca liveness p
 | Pod açılır açılmaz `Error`: `can't open file '/app/app.py': [Errno 13] Permission denied` | Mac'teki dosyanın izni `0600` idi; `COPY` izni imaja aynen taşıdı, uygulama ise root olmayan kullanıcıyla (uid 10001) çalışıyor | `COPY --chmod=0644 app.py .` |
 | Dockerfile düzeldiği hâlde pod'lar aynı hatayı veriyor | İmaj aynı `1.0` etiketiyle yeniden derlendi; `imagePullPolicy: IfNotPresent` olduğu için düğüm önbellekteki eski imajı kullandı | Her değişiklikte yeni etiket (`1.1`); `latest` gibi değişen etiketlere güvenmemek |
 | Pod model yüklenmeden yeniden başlatılıyor | Yalnızca liveness probe vardı; model yüklenirken `/healthz` 503 dönüyor | `startupProbe` + ayrı `readinessProbe` + kaynak sınırları |
-| Liveness hatasından sonra konteyner ~30 sn geç kapanıyor (önceki logda `model hazır` görünüyor) | Python konteynerde PID 1; işleyicisi olmayan `SIGTERM` iletilmiyor, kubelet 30 sn'lik `terminationGracePeriodSeconds` sonunda `SIGKILL` gönderiyor | Açık not: `SIGTERM` işleyicisi eklemek ya da tini gibi bir init süreci kullanmak |
+| Liveness hatasından sonra konteyner ~30 sn geç kapanıyor (önceki logda `model hazır` görünüyor) | Python konteynerde PID 1; işleyicisi olmayan `SIGTERM` iletilmiyor, kubelet 30 sn'lik `terminationGracePeriodSeconds` sonunda `SIGKILL` gönderiyor | `app.py`'de `SIGTERM` işleyicisi (`1.2`): `docker stop` 3,1 sn → 0,1 sn |
+| Yönetim paneli stil dosyaları olmadan açılıyor, `/static/admin/...` 404 | Daphne yalnızca ASGI uygulamasını çalıştırıyor, statik dosya sunmuyor | Geliştirmede `ASGIStaticFilesHandler` (`config/asgi.py`); üretimde önündeki web sunucusu |
 
 ## Testler
 
@@ -101,7 +102,9 @@ Görüntüleri MacBook Air (Apple Silicon) üzerinde Docker Desktop ve yerleşik
 | ![](docs/ekran_goruntuleri/03_compose_localhost_hatasi.jpg)<br/>`DB_HOST=localhost` ile bağlantı hatası | ![](docs/ekran_goruntuleri/04_compose_servis_adi_cozum.jpg)<br/>Servis adı + healthcheck, migration ve `/health/` |
 | ![](docs/ekran_goruntuleri/05_websocket_transkript_paneli.jpg)<br/>WebSocket transkript paneli | ![](docs/ekran_goruntuleri/06_seed_migration_test.jpg)<br/>Deneme verisi, migration durumu ve PostgreSQL üzerinde testler |
 | ![](docs/ekran_goruntuleri/07_k8s_izin_hatasi.jpg)<br/>`0600` dosya izni imaja taşındı: `Permission denied` | ![](docs/ekran_goruntuleri/08_k8s_ayni_etiket_eski_imaj.jpg)<br/>Aynı etiket: yerel imaj düzeldi, düğümdeki imaj eski |
-| ![](docs/ekran_goruntuleri/09_k8s_liveness_yeniden_baslatma.jpg)<br/>Yalnız liveness probe: model yüklenirken yeniden başlatma | ![](docs/ekran_goruntuleri/10_k8s_startup_probe_cozum.jpg)<br/>startupProbe + readinessProbe ile rollout; EndpointSlice'ta yalnız yeni pod hazır |
+| ![](docs/ekran_goruntuleri/09_k8s_liveness_yeniden_baslatma.jpg)<br/>Yalnız liveness probe (1.1): yeniden başlatma, önceki logda `model hazır` | ![](docs/ekran_goruntuleri/13_k8s_sigterm_1_1_ve_1_2.jpg)<br/>`SIGTERM` işleyicisi: `docker stop` 1.1 → 3,1 sn, 1.2 → 0,1 sn |
+| ![](docs/ekran_goruntuleri/14_k8s_liveness_1_2.jpg)<br/>Yalnız liveness probe (1.2): bir dakikada 3 yeniden başlatma, CrashLoopBackOff | ![](docs/ekran_goruntuleri/10_k8s_startup_probe_cozum.jpg)<br/>startupProbe + readinessProbe ile rollout; EndpointSlice'ta yalnız yeni pod hazır |
+| ![](docs/ekran_goruntuleri/11_migration_uygulanmamis.jpg)<br/>Uygulanmamış migration: `column ... does not exist`, `showmigrations`, `migrate` | ![](docs/ekran_goruntuleri/12_django_admin.jpg)<br/>Yönetim panelinde mülakat ve satır içi transkript parçaları |
 
 ## Lisans
 

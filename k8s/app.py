@@ -4,6 +4,8 @@ Model ağırlıkları yüklenirken servis ayağa kalkar ama istek alamaz;
 yükleme bitince /healthz ve /ready uçları 200 döner.
 """
 import os
+import signal
+import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -34,6 +36,14 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
+def handle_sigterm(signum, frame):
+    # Konteynerde PID 1 olarak çalışıyoruz: işleyicisi olmayan SIGTERM çekirdek
+    # tarafından yok sayılıyor ve kubelet 30 sn bekleyip SIGKILL gönderiyordu.
+    print("SIGTERM alındı, kapanıyor", flush=True)
+    sys.exit(0)
+
+
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, handle_sigterm)
     threading.Thread(target=load_model, daemon=True).start()
     ThreadingHTTPServer(("0.0.0.0", 8080), Handler).serve_forever()

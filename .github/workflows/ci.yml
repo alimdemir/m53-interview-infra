@@ -55,8 +55,8 @@ jobs:
 
       - name: İmajı derle ve kümeye yükle
         run: |
-          docker build -t soru-servisi:1.1 k8s/
-          kind load docker-image soru-servisi:1.1 --name chart-testing
+          docker build -t soru-servisi:1.2 k8s/
+          kind load docker-image soru-servisi:1.2 --name chart-testing
 
       - name: Deployment ve Service
         run: kubectl apply -f k8s/deployment.yaml -f k8s/service.yaml
